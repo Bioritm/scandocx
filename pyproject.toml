@@ -1,0 +1,16 @@
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gost-precheck-pro"
+version = "1.0.0"
+description = "High-performance GOST 2.105/34 precheck with parallelism, configs, and folder watch"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name="Your Team", email="team@example.com"}]
+dependencies = []
+
+[project.scripts]
+gost-precheck = "gost_precheck.cli:main"

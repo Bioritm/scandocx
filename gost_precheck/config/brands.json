@@ -1,0 +1,33 @@
+{
+  "rules": [
+    {
+      "pattern": "\\bPostgres\\s*PRO\\b",
+      "good": "Postgres Pro",
+      "rule_id": "BRAND_POSTGRES_PRO"
+    },
+    {
+      "pattern": "\\bPostgre\\s*Sql\\b",
+      "good": "PostgreSQL",
+      "rule_id": "BRAND_POSTGRESQL",
+      "ignore_case": true
+    },
+    {
+      "pattern": "\\bPostgresql\\b",
+      "good": "PostgreSQL",
+      "rule_id": "BRAND_POSTGRESQL",
+      "ignore_case": true
+    },
+    {
+      "pattern": "\\bReddis\\b",
+      "good": "Redis",
+      "rule_id": "BRAND_REDIS_SPELL",
+      "ignore_case": true
+    },
+    {
+      "pattern": "(?<![`])\\bredis\\b(?![`])",
+      "good": "Redis",
+      "rule_id": "BRAND_REDIS_CASE",
+      "ignore_case": false
+    }
+  ]
+}

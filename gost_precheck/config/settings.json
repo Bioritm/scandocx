@@ -1,0 +1,13 @@
+{
+  "parallel_workers": 0,
+  "numbering_scope": "global",
+  "spell": {
+    "enabled": true,
+    "min_len": 3,
+    "skip_upper": true,
+    "suggestions": false,
+    "max_suggestions_per_word": 3,
+    "only_ru": true
+  },
+  "ws_trailing": "ignore"
+}

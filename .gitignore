@@ -1,0 +1,24 @@
+# OS/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.env
+.env.*
+
+# Сборки/артефакты (PyInstaller и пр.)
+build/
+dist/
+*.spec
+*.exe
+*.zip
+*.7z
+*.rar
