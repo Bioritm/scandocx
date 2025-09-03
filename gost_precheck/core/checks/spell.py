@@ -1,59 +1,101 @@
-from typing import List, Dict
+# gost_precheck/core/checks/spell.py
+from __future__ import annotations
+from typing import List, Dict, Set
+import re, os
+
 from ..issue import Issue
 from ..constants import CATEGORY, RID, SEVERITY_ERROR
 from ..utils import context_slice
-import re
 
-def check(paragraph: str, idx: int, cfg: Dict) -> List[Issue]:
-    settings = cfg["settings"].get("spell", {})
-    if not settings.get("enabled", False):
-        return []
+# токены: рус/лат буквы + дефис/апостроф, но не числа
+TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё\-’']{1,}", re.UNICODE)
 
-    # --- читаем набор языков из настроек; по умолчанию только русский ---
-    langs = settings.get("langs", ["ru_RU"])
+# глобалы в процессе (для ProcessPool)
+_ENCHANT_READY = False
+_ENCHANT_DICT = None
+_WORDLIST_CACHE: Set[str] | None = None
 
+def _try_init_enchant(lang: str) -> bool:
+    global _ENCHANT_READY, _ENCHANT_DICT
+    if _ENCHANT_READY:
+        return _ENCHANT_DICT is not None
     try:
         import enchant
+        _ENCHANT_DICT = enchant.Dict(lang)
+        _ENCHANT_READY = True
+        return True
     except Exception:
-        return []
+        _ENCHANT_DICT = None
+        _ENCHANT_READY = True
+        return False
 
-    issues: List[Issue] = []
+def _ensure_wordlist(cfg: Dict):
+    global _WORDLIST_CACHE
+    if _WORDLIST_CACHE is not None:
+        return
+    p = cfg.get("dict_ru_wordlist_path")
+    _WORDLIST_CACHE = set()
+    if p and os.path.exists(p):
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            for ln in f:
+                w = ln.strip()
+                if w:
+                    _WORDLIST_CACHE.add(w.lower())
 
-    # инициализируем только те словари, что реально нужны
-    ru = enchant.Dict("ru_RU") if "ru_RU" in langs else None
-    en = enchant.Dict("en_US") if "en_US" in langs else None
+def _is_ok_by_wordlist(word: str, cfg: Dict) -> bool:
+    _ensure_wordlist(cfg)
+    if not _WORDLIST_CACHE:
+        return False
+    return word.lower() in _WORDLIST_CACHE
 
-    wl = set(cfg.get("ignore", {}).get("spell_whitelist", []))
+def _user_whitelist(cfg: Dict) -> Set[str]:
+    return cfg.get("dict_user_words", set())
 
-    # слова: RU/EN, допускаем дефис внутри
-    for m in re.finditer(r"[A-Za-zА-Яа-яЁё]+(?:-[A-Za-zА-Яа-яЁё]+)?", paragraph):
-        w = m.group(0)
-        if w in wl:
+def _is_ignorable(tok: str) -> bool:
+    # игнор: ALLCAPS аббревиатуры, токены с цифрами, слишком короткие
+    if any(ch.isdigit() for ch in tok):
+        return True
+    if tok.isupper() and len(tok) <= 6:
+        return True
+    return False
+
+def check(paragraph: str, idx: int, cfg: Dict) -> List[Issue]:
+    out: List[Issue] = []
+    spell_cfg = cfg.get("settings", {}).get("spell", {})
+    if not spell_cfg.get("enabled", False):
+        return out
+
+    lang = spell_cfg.get("lang", "ru_RU")
+    use_enchant = _try_init_enchant(lang)
+    wl_user = _user_whitelist(cfg)
+    min_len = int(spell_cfg.get("min_len", 3))
+
+    for m in TOKEN_RE.finditer(paragraph):
+        tok = m.group(0)
+        if len(tok) < min_len or _is_ignorable(tok) or tok.lower() in wl_user:
             continue
-        if len(w) <= settings.get("min_len", 3) or (settings.get("skip_upper", True) and w.isupper()):
-            continue
 
-        # если есть кириллица — проверяем русским (если включён), иначе — английским (если включён)
-        if re.search(r"[А-Яа-яЁё]", w):
-            d = ru; lid = RID["SPELL_RU"]
-        else:
-            d = en; lid = RID["SPELL_EN"]
+        ok = False
+        suggestions = []
+        if use_enchant and _ENCHANT_DICT is not None:
+            try:
+                ok = _ENCHANT_DICT.check(tok)
+                if not ok:
+                    suggestions = _ENCHANT_DICT.suggest(tok)[:3]
+            except Exception:
+                ok = False
 
-        # язык отключён → пропускаем
-        if not d:
-            continue
+        if not ok and _is_ok_by_wordlist(tok, cfg):
+            ok = True
 
-        if not d.check(w):
-            repl = []
-            if settings.get("suggestions", False):
-                try:
-                    sug = d.suggest(w)
-                    if sug:
-                        repl = sug[: settings.get("max_suggestions_per_word", 3)]
-                except Exception:
-                    pass
-            issues.append(Issue(
-                idx, m.start(), len(w), SEVERITY_ERROR, CATEGORY["SPELL"], lid,
-                "Возможная орфографическая ошибка", context_slice(paragraph, m.start()), repl
+        if not ok:
+            out.append(Issue(
+                idx, m.start(), len(tok),
+                SEVERITY_ERROR,
+                CATEGORY["Орфография"],
+                RID["SPELL_UNKNOWN"],
+                f"Возможная орфографическая ошибка: «{tok}»",
+                context_slice(paragraph, m.start()),
+                suggestions
             ))
-    return issues
+    return out

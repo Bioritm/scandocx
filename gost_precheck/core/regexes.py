@@ -1,45 +1,60 @@
-# -*- coding: utf-8 -*-
+# gost_precheck/core/regexes.py
 import re
 
-# Любой «пробельный» символ, который часто встречается в .docx:
-# обычный пробел + NBSP + узкие пробелы.
-SP = r"[ \u00A0\u202F\u2009]"
+# --- пробелы/механика ---
+RE_DOUBLE_SPACES = re.compile(r" {2,}")
+RE_TABS          = re.compile(r"\t")
+RE_TRAILING      = re.compile(r"[ \t]+$")
 
-# --- whitespace -------------------------------------------------------------
+# --- скобочные пробелы ---
+RE_PAREN_SPACE_AFTER_OPEN  = re.compile(r"\(\s")
+RE_PAREN_SPACE_BEFORE_CLOSE= re.compile(r"\s\)")
 
-RE_TABS = re.compile(r"\t")
-RE_TRAILING = re.compile(rf"{SP}+$")
-RE_DOUBLE_SPACES = re.compile(rf"{SP}{{2,}}")
+# --- пунктуация ---
+# лишний пробел ПЕРЕД знаком
+RE_SPACE_BEFORE_PUNCT = re.compile(r" (?=[,.;:!?])")
 
-# Скобки «( xxx» и «xxx )»
-RE_PAREN_SPACE_AFTER_OPEN = re.compile(r"\(\s")
-RE_PAREN_SPACE_BEFORE_CLOSE = re.compile(r"\s\)")
-
-# --- punctuation ------------------------------------------------------------
-
-# Лишний пробел ПЕРЕД знаком препинания (закрывающие знаки)
-RE_SPACE_BEFORE_PUNCT = re.compile(rf"{SP}+(?=[,;:.!?%)»])")
-
-# Нет пробела ПОСЛЕ знака препинания.
-# 1) запятая — исключаем числа формата 1,23
-# 2) прочие знаки — просто требуем пробел после
+# нет пробела ПОСЛЕ знака (исключаем случаи вроде ",)" или ",…")
 RE_NO_SPACE_AFTER_PUNCT = re.compile(
-    rf"(?:(?<!\d),(?![\s\d])|;(?!{SP})|:(?!{SP})|[!?](?!{SP}))"
+    r"([,;:!?])(?![\s\)\]\}\-–—…]|$)"
 )
 
-# Повторы знаков
-RE_DOUBLE_COMMA = re.compile(r",\s*,")
-RE_DOUBLE_SEMI = re.compile(r";\s*;")
-RE_DOUBLE_COLON = re.compile(r":\s*:")
+# дубли знаков
+RE_DOUBLE_COMMA  = re.compile(r",,")
+RE_DOUBLE_SEMI   = re.compile(r";;")
+RE_DOUBLE_COLON  = re.compile(r"::")
+RE_TWO_DOTS      = re.compile(r"(?<!\.)\.\.(?!\.)")  # ровно две
+RE_MANY_DOTS     = re.compile(r"\.{4,}")             # 4+
 
-# ".." (но не часть "..." или "....")
-RE_TWO_DOTS = re.compile(r"(?<!\.)\.\.(?!\.)")
+# минус вместо тире «между словами с пробелами»
+RE_HYPHEN_AS_DASH = re.compile(r"(?<=\S) - (?=\S)")
 
-# 4+ точек
-RE_MANY_DOTS = re.compile(r"\.{4,}")
+# --- слово+цифра (Процедура1) ---
+RE_WORD_DIGIT = re.compile(r"(?<![\d\W])[A-Za-zА-Яа-яЁё]+(?:-\w+)?\d+")
 
-# Нет пробела между словом и числом: "Глава5", "версия15"
-RE_WORD_DIGIT = re.compile(r"([A-Za-zА-Яа-яЁё])([0-9])")
 
-# Нет пробела между числом и словом: "5глава", "15версия"
-RE_DIGIT_WORD = re.compile(r"([0-9])([A-Za-zА-Яа-яЁё])")
+# gost_precheck/core/regexes.py
+import re
+
+
+# Подписи: "Таблица 1 — Название", "Рисунок 2 - Название", "Рис. 3 – Название"
+RE_CAPTION = re.compile(
+    r'^(?P<kind>Таблица|Рисунок|Рис\.)\s*(?P<num>\d+)\s*(?P<dash>[-–—])\s*(?P<title>.+)$',
+    re.IGNORECASE
+)
+
+# Недопустимое тире (в подписи должно быть длинное '—')
+RE_CAPTION_BAD_DASH = re.compile(
+    r'^(?:Таблица|Рисунок|Рис\.)\s*\d+\s*([-–])\s*.+$',  # короткое или en-dash
+    re.IGNORECASE
+)
+
+# Нет пробела до/после тире
+RE_CAPTION_SPACING = re.compile(
+    r'^(?:Таблица|Рисунок|Рис\.)\s*\d+(?:\s*[—]\S|\S[—]\s*)',  # нет пробела с одной стороны
+    re.IGNORECASE
+)
+
+RE_DASH_WORDS = re.compile(r'(?<!\d)(?<=\S)\s-\s(?=\S)(?!\d)')
+RE_DASH_TIGHT = re.compile(r'(?<!\d)(?<=\S)-(?!\d)(?=\S)')
+RE_STRAIGHT_QUOTES = re.compile(r'"([^"\n]{1,200})"')

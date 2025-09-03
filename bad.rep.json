@@ -1,0 +1,89 @@
+{
+  "version": "GOST-21_34-PLUS",
+  "file": "bad",
+  "checked_at": "2025-09-03T12:00:55Z",
+  "issues_total": 6,
+  "issues_by_category": {
+    "Пробелы/механика": 3,
+    "Знаки препинания": 3
+  },
+  "gate": {
+    "errors": 5,
+    "warnings": 1,
+    "pass": false
+  },
+  "issues": [
+    {
+      "para_index": 0,
+      "offset": 0,
+      "length": 3,
+      "severity": "ошибка",
+      "category": "Пробелы/механика",
+      "rule_id": "WS_DOUBLE_SPACES",
+      "message": "Обнаружены двойные пробелы",
+      "context": "   , .. -  ",
+      "replacements": []
+    },
+    {
+      "para_index": 0,
+      "offset": 2,
+      "length": 1,
+      "severity": "ошибка",
+      "category": "Знаки препинания",
+      "rule_id": "PUNCT_SPACE_BEFORE",
+      "message": "Лишний пробел перед знаком препинания",
+      "context": "   , .. -  ",
+      "replacements": [
+        "убрать пробел"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 4,
+      "length": 1,
+      "severity": "ошибка",
+      "category": "Знаки препинания",
+      "rule_id": "PUNCT_SPACE_BEFORE",
+      "message": "Лишний пробел перед знаком препинания",
+      "context": "   , .. -  ",
+      "replacements": [
+        "убрать пробел"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 5,
+      "length": 2,
+      "severity": "ошибка",
+      "category": "Знаки препинания",
+      "rule_id": "PUNCT_TWO_DOTS",
+      "message": "Ровно две точки — используйте «…»",
+      "context": "   , .. -  ",
+      "replacements": [
+        "…"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 9,
+      "length": 2,
+      "severity": "ошибка",
+      "category": "Пробелы/механика",
+      "rule_id": "WS_DOUBLE_SPACES",
+      "message": "Обнаружены двойные пробелы",
+      "context": "   , .. -  ",
+      "replacements": []
+    },
+    {
+      "para_index": 0,
+      "offset": 9,
+      "length": 2,
+      "severity": "предупреждение",
+      "category": "Пробелы/механика",
+      "rule_id": "WS_TRAILING",
+      "message": "Лишний пробел в конце строки",
+      "context": "   , .. -  ",
+      "replacements": []
+    }
+  ]
+}

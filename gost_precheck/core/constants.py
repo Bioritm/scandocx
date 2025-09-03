@@ -2,21 +2,25 @@
 NBSP = "\u00A0"
 
 CATEGORY = {
-    'SPELL': 'Орфография/грамматика',
+    'SPELL_UNKNOWN': 'Орфография',
     'PUNCT': 'Знаки препинания',
     'TYPO': 'Типографика',
     'WS': 'Пробелы/механика',
-    'CAPTION': 'Оформление подписей (ГОСТ)',
+    'CAPTION': 'Подписи',
     'BRAND': 'Терминология/бренды',
     'GOST34': 'Ссылки на стандарты',
+    'CAPTIONS': 'Подписи таблиц/рисунков',
+    'NORM': 'Нормализация',
 }
 
-SEVERITY_ERROR = "ошибка"
-SEVERITY_WARN = "предупреждение"
+SEVERITY_ERROR = 'ошибка'
+SEVERITY_WARN = 'предупреждение'
 
 RID = {
     'SPELL_RU': 'SPELL_RU',
     'SPELL_EN': 'SPELL_EN',
+    'SPELL_UNKNOWN' : 'SPELL_UNKNOWN',
+    'SPELL_WORD': 'SPELL_WORD',
     'PUNCT_SPACE_BEFORE': 'PUNCT_SPACE_BEFORE',
     'PUNCT_NO_SPACE_AFTER': 'PUNCT_NO_SPACE_AFTER',
     'PUNCT_DOUBLE_COMMA': 'PUNCT_DOUBLE_COMMA',
@@ -49,4 +53,15 @@ RID = {
     'SPACE_HYPHEN_SPACE': 'SPACE_HYPHEN_SPACE',
     'DASH_SPACING': 'DASH_SPACING',
     'HYPHEN_INSTEAD_OF_DASH': 'HYPHEN_INSTEAD_OF_DASH',
+    'PUNCT_HYPHEN_AS_DASH': 'PUNCT_HYPHEN_AS_DASH',
+    'CAPTION_BAD_DASH': 'CAPTION_BAD_DASH',
+    'CAPTION_SPACING': 'CAPTION_SPACING',
+    'CAPTION_EMPTY': 'CAPTION_EMPTY',
+    'CAPTION_DUP': 'CAPTION_DUP',
+    'CAPTION_ORDER': 'CAPTION_ORDER',
+    'POSTNORM_DASH': 'POSTNORM_DASH',
+    'POSTNORM_QUOTES': 'POSTNORM_QUOTES',
+    'CAPTION_EMPTY_TITLE' : 'CAPTION_EMPTY_TITLE',
+    'CAPTION_DUP_NUMBER' : 'CAPTION_DUP_NUMBER',
+    'PUNCT_DASH_IN_CAPTION' : 'PUNCT_DASH_IN_CAPTION',
 }

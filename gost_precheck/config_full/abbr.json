@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "pattern": "\\bв\\s*т\\.?\\s*ч\\.?\\b",
+      "replacement": "в т. ч.",
+      "replacement_nbsp": "в т. ч."
+    },
+    {
+      "pattern": "\\bт\\.?\\s*е\\.?\\b",
+      "replacement": "т. е.",
+      "replacement_nbsp": "т. е."
+    },
+    {
+      "pattern": "\\bт\\.?\\s*к\\.?\\b",
+      "replacement": "т. к.",
+      "replacement_nbsp": "т. к."
+    },
+    {
+      "pattern": "\\bи\\s*т\\.?\\s*д\\.?\\b",
+      "replacement": "и т. д.",
+      "replacement_nbsp": "и т. д."
+    },
+    {
+      "pattern": "\\bи\\s*т\\.?\\s*п\\.?\\b",
+      "replacement": "и т. п.",
+      "replacement_nbsp": "и т. п."
+    }
+  ]
+}
