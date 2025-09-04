@@ -1,0 +1,92 @@
+{
+  "version": "GOST-21_34-PLUS",
+  "file": "yadovity",
+  "checked_at": "2025-09-04T01:22:47Z",
+  "issues_total": 4,
+  "issues_by_category": {
+    "Пробелы/механика": 2,
+    "Знаки препинания": 2
+  },
+  "gate": {
+    "errors": 4,
+    "warnings": 0,
+    "pass": false
+  },
+  "issues": [
+    {
+      "para_index": 0,
+      "offset": 2,
+      "length": 1,
+      "severity": "ошибка",
+      "category": "Знаки препинания",
+      "rule_id": "PUNCT_SPACE_BEFORE",
+      "message": "Лишний пробел перед знаком препинания",
+      "context": "\\t   . \t      .",
+      "replacements": [
+        "убрать пробел"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 2,
+      "length": 3,
+      "severity": "ошибка",
+      "category": "Пробелы/механика",
+      "rule_id": "WS_DOUBLE_SPACES",
+      "message": "Обнаружены двойные пробелы.",
+      "context": "\\t   . \t      .",
+      "replacements": [
+        "один пробел"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 6,
+      "length": 1,
+      "severity": "ошибка",
+      "category": "Знаки препинания",
+      "rule_id": "PUNCT_SPACE_BEFORE",
+      "message": "Лишний пробел перед знаком препинания",
+      "context": "\\t   . \t      .",
+      "replacements": [
+        "убрать пробел"
+      ]
+    },
+    {
+      "para_index": 0,
+      "offset": 7,
+      "length": 1,
+      "severity": "ошибка",
+      "category": "Пробелы/механика",
+      "rule_id": "WS_TABS",
+      "message": "Символ табуляции в тексте — используйте пробелы.",
+      "context": "\\t   . \t      .",
+      "replacements": [
+        "заменить таб на пробелы"
+      ]
+    }
+  ],
+  "rule_stats": {
+    "PUNCT_SPACE_BEFORE": 2,
+    "WS_DOUBLE_SPACES": 1,
+    "WS_TABS": 1
+  },
+  "debug": {
+    "loader_stats": {
+      "p_total": 1,
+      "kept": 1,
+      "blank": 0,
+      "wt": 0,
+      "instr": 0,
+      "deleted": 0,
+      "tabs": 0,
+      "tabs_injected": 0,
+      "br": 0,
+      "parts": 0,
+      "styles": []
+    },
+    "timing": {},
+    "profile": null,
+    "internal_errors": []
+  }
+}

@@ -9,17 +9,14 @@
     "nbsp": true,
     "strip_zw": true
   },
-
   "post_normalize": {
     "dashes": false,
     "quotes": false
   },
 
-  "loader_filters": {
-    "drop_toc_like": false,
-    "drop_dot_heavy": false,
-    "drop_pure_number": false,
-    "keep_all": true
+  "loader": {
+    "include_styles": true,
+    "include_tabs": true
   },
 
   "spell": {
@@ -27,10 +24,12 @@
     "parallel_workers": 0,
     "min_len": 3,
     "skip_upper": true,
-    "suggestions": false,
+    "suggestions": true,
     "max_suggestions_per_word": 3,
     "ru": true,
-    "en": false
+    "en": false,
+    "dict_dir": "auto",
+    "pwl_path": ""
   },
 
   "warnings": {
