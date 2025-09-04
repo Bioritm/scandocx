@@ -1,0 +1,7 @@
+Postgres
+PostgreSQL
+Superuser
+БД
+суперпользователь
+инсталлятор
+микросервис

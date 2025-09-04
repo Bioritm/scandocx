@@ -10,8 +10,8 @@
     "strip_zw": true
   },
   "post_normalize": {
-    "dashes": false,
-    "quotes": false
+    "dashes": true,
+    "quotes": true
   },
 
   "loader": {
@@ -29,7 +29,17 @@
     "ru": true,
     "en": false,
     "dict_dir": "auto",
-    "pwl_path": ""
+    "emit_only_with_suggestions": true,
+    "pwl_path": "gost_precheck/dicts/pwl_ru.txt"
+  },
+
+  "spell_booster": {
+    "enabled": true,
+    "min_len": 4,
+    "skip_upper": true,
+    "max_distance": 2,          
+    "ratio": 0.34,             
+    "max_suggestions": 3
   },
 
   "warnings": {

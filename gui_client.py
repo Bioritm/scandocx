@@ -1,174 +1,271 @@
 # gui_client.py
-import os, threading, queue, traceback
-from tkinter import Tk, StringVar, BooleanVar, filedialog, messagebox
-from tkinter import ttk
+import os
+import sys
+import threading
+import queue
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from datetime import datetime
 
+# Поддержка frozen-приложений (PyInstaller + multiprocessing)
+try:
+    from multiprocessing import freeze_support
+    freeze_support()
+except Exception:
+    pass
+
+# Чистые импорты нашей библиотеки
 from gost_precheck.core.config import load_all
 from gost_precheck.core.engine import analyze_file
+from gost_precheck.core.reporting import write_reports
 
 APP_TITLE = "gost-precheck — Desktop"
-DEFAULT_CFG = os.path.join(os.path.dirname(__file__), "gost_precheck", "config_full")
+APP_VERSION = "GOST-21_34-PLUS"
 
-class App:
-    def __init__(self, root: Tk):
-        self.root = root
-        self.root.title(APP_TITLE)
-        self.root.geometry("1000x660")
+# --- вспомогалки -------------------------------------------------------------
 
-        top = ttk.Frame(root, padding=8); top.pack(side="top", fill="x")
-        self.cfg_dir = StringVar(value=DEFAULT_CFG)
-        ttk.Label(top, text="Профиль:").pack(side="left")
-        ttk.Entry(top, width=60, textvariable=self.cfg_dir).pack(side="left", padx=4)
-        ttk.Button(top, text="Выбрать…", command=self.pick_cfg).pack(side="left", padx=4)
+def _enumerate_targets(paths, recursive: bool):
+    out = []
+    for p in paths:
+        if os.path.isdir(p):
+            patterns = ("*.docx", "*.txt")
+            if recursive:
+                for pat in patterns:
+                    for root, _, files in os.walk(p):
+                        out.extend(os.path.join(root, f) for f in files if f.lower().endswith(pat[1:]))
+            else:
+                for pat in patterns:
+                    out.extend(os.path.join(p, f) for f in os.listdir(p) if f.lower().endswith(pat[1:]))
+        else:
+            out.append(p)
+    # убирать дубликаты, сохраняем порядок
+    seen = set()
+    uniq = []
+    for f in out:
+        if f not in seen:
+            seen.add(f)
+            uniq.append(f)
+    return uniq
 
-        self.recursive = BooleanVar(value=False)
-        ttk.Checkbutton(top, text="Рекурсивно", variable=self.recursive).pack(side="left", padx=10)
-        ttk.Button(top, text="Файлы…", command=self.pick_files).pack(side="left", padx=4)
-        ttk.Button(top, text="Папка…", command=self.pick_folder).pack(side="left", padx=4)
-        ttk.Button(top, text="Пуск", command=self.run).pack(side="left", padx=12)
+def _human_profile_path(p):
+    try:
+        return p if not getattr(sys, "frozen", False) else p.replace(os.environ.get("TEMP",""), r"%TEMP%")
+    except Exception:
+        return p
 
-        stat = ttk.Frame(root, padding=(8,0,8,0)); stat.pack(side="top", fill="x")
-        self.status = StringVar(value="Готово.")
-        self.progress = ttk.Progressbar(stat, mode="determinate", maximum=100)
-        self.progress.pack(side="right", fill="x", expand=True, padx=4)
-        ttk.Label(stat, textvariable=self.status).pack(side="left")
+# --- GUI ---------------------------------------------------------------------
 
-        center = ttk.Frame(root, padding=8); center.pack(side="top", fill="both", expand=True)
-        cols = ("file","severity","category","rule","para","offset","message","context")
-        self.tree = ttk.Treeview(center, columns=cols, show="headings", height=22)
-        for c, w in [("file",200),("severity",100),("category",150),("rule",160),
-                     ("para",60),("offset",60),("message",360),("context",320)]:
-            self.tree.heading(c, text=c); self.tree.column(c, width=w, anchor="w")
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb = ttk.Scrollbar(center, orient="vertical", command=self.tree.yview)
-        vsb.pack(side="right", fill="y"); self.tree.configure(yscrollcommand=vsb.set)
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title(f"{APP_TITLE}")
+        self.geometry("1200x560")
 
-        bottom = ttk.Frame(root, padding=8); bottom.pack(side="bottom", fill="x")
-        ttk.Button(bottom, text="Открыть .rep/.json", command=self.open_reports).pack(side="left")
-        ttk.Button(bottom, text="Открыть папку", command=self.open_dir).pack(side="left", padx=6)
-        ttk.Button(bottom, text="Очистить", command=self.clear_all).pack(side="right")
+        self.cfg_root = os.path.join(os.path.dirname(__file__), "gost_precheck", "config_full")
+        self.recursive_var = tk.BooleanVar(value=False)
 
-        self.files = []
+        self._build_toolbar()
+        self._build_table()
+        self._build_footer()
+
         self.q = queue.Queue()
         self.worker = None
 
-    def pick_cfg(self):
-        d = filedialog.askdirectory(initialdir=self.cfg_dir.get() or ".", title="Папка с settings.json")
-        if d: self.cfg_dir.set(d)
+    def _build_toolbar(self):
+        frm = ttk.Frame(self)
+        frm.pack(fill="x", padx=6, pady=4)
 
-    def pick_files(self):
-        paths = filedialog.askopenfilenames(
-            filetypes=[("Docs","*.docx;*.txt"),("DOCX","*.docx"),("TXT","*.txt"),("All","*.*")]
+        ttk.Label(frm, text="Профиль:").pack(side="left")
+        self.profile_lbl_var = tk.StringVar(value=_human_profile_path(self.cfg_root))
+        self.profile_lbl = ttk.Entry(frm, textvariable=self.profile_lbl_var, width=80)
+        self.profile_lbl.pack(side="left", padx=6)
+
+        ttk.Button(frm, text="Выбрать...", command=self.on_choose_profile).pack(side="left", padx=4)
+
+        self.rec_chk = ttk.Checkbutton(frm, text="Рекурсивно", variable=self.recursive_var)
+        self.rec_chk.pack(side="left", padx=8)
+
+        ttk.Button(frm, text="Файлы...", command=self.on_files).pack(side="left", padx=4)
+        ttk.Button(frm, text="Папка...", command=self.on_folder).pack(side="left", padx=4)
+        ttk.Button(frm, text="Пуск", command=self.on_run).pack(side="left", padx=12)
+
+        self.pb = ttk.Progressbar(frm, mode="determinate")
+        self.pb.pack(side="left", fill="x", expand=True, padx=10)
+        self.status = ttk.Label(frm, text="Готово.")
+        self.status.pack(side="left", padx=4)
+
+        self.targets = []  # выбранные объекты
+
+    def _build_table(self):
+        cols = ("file","severity","category","rule","para","offset","message","context")
+        self.tree = ttk.Treeview(self, columns=cols, show="headings")
+        self.tree.pack(fill="both", expand=True, padx=6, pady=4)
+
+        headers = {
+            "file": "file",
+            "severity": "severity",
+            "category": "category",
+            "rule": "rule",
+            "para": "para",
+            "offset": "offset",
+            "message": "message",
+            "context": "context",
+        }
+        for c in cols:
+            self.tree.heading(c, text=headers[c])
+            self.tree.column(c, width=120 if c!="context" else 600, anchor="w", stretch=True)
+        self.tree.column("para", width=60, anchor="center")
+        self.tree.column("offset", width=60, anchor="center")
+
+        # контекстное меню
+        self.menu = tk.Menu(self, tearoff=0)
+        self.menu.add_command(label="Открыть .rep/.json", command=self.on_open_report)
+        self.menu.add_command(label="Открыть папку", command=self.on_open_folder)
+        self.tree.bind("<Button-3>", self._popup)
+
+    def _build_footer(self):
+        frm = ttk.Frame(self)
+        frm.pack(fill="x", padx=6, pady=6)
+        ttk.Button(frm, text="Открыть .rep/.json", command=self.on_open_report).pack(side="left")
+        ttk.Button(frm, text="Открыть папку", command=self.on_open_folder).pack(side="left", padx=6)
+        ttk.Button(frm, text="Очистить", command=self.on_clear).pack(side="right")
+
+    # ---- события -------------------------------------------------------------
+
+    def on_choose_profile(self):
+        p = filedialog.askdirectory(title="Папка с конфигами JSON (settings.json, abbr.json, ...)")
+        if p:
+            self.cfg_root = p
+            self.profile_lbl_var.set(_human_profile_path(p))
+
+    def on_files(self):
+        files = filedialog.askopenfilenames(
+            title="Выберите файлы .docx/.txt",
+            filetypes=(("DOCX/TXT","*.docx *.txt"), ("Все файлы","*.*")),
         )
-        if paths:
-            self.files.extend(list(paths))
-            self.status.set(f"Добавлено файлов: {len(paths)} (всего {len(self.files)})")
+        if files:
+            self.targets = list(files)
+            self.status["text"] = f"Выбрано файлов: {len(self.targets)}"
 
-    def pick_folder(self):
-        d = filedialog.askdirectory(title="Папка с документами")
-        if not d: return
-        if self.recursive.get():
-            for root, _dirs, files in os.walk(d):
-                for name in files:
-                    if name.lower().endswith((".docx",".txt")):
-                        self.files.append(os.path.join(root, name))
-        else:
-            for name in os.listdir(d):
-                p = os.path.join(d, name)
-                if os.path.isfile(p) and name.lower().endswith((".docx",".txt")):
-                    self.files.append(p)
-        self.status.set(f"Добавлено из папки. Всего файлов: {len(self.files)}")
+    def on_folder(self):
+        folder = filedialog.askdirectory(title="Выберите папку")
+        if folder:
+            self.targets = [folder]
+            self.status["text"] = f"Выбрана папка: {folder}"
 
-    def run(self):
-        if not self.files:
-            messagebox.showinfo(APP_TITLE, "Добавьте .docx/.txt")
+    def on_clear(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+    def _popup(self, event):
+        try:
+            self.tree.selection_set(self.tree.identify_row(event.y))
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
+
+    def on_open_report(self):
+        sel = self.tree.selection()
+        if not sel:
             return
-        cfg_root = self.cfg_dir.get().strip()
-        if not os.path.isfile(os.path.join(cfg_root, "settings.json")):
-            messagebox.showerror(APP_TITLE, f"В {cfg_root} нет settings.json")
+        file_path = self.tree.set(sel[0], "file")
+        base, _ = os.path.splitext(file_path)
+        rep = base + ".rep"
+        repj = base + ".rep.json"
+        for p in (rep, repj):
+            if os.path.exists(p):
+                try:
+                    os.startfile(p)  # Windows
+                except Exception:
+                    messagebox.showinfo("Открыть", p)
+
+    def on_open_folder(self):
+        sel = self.tree.selection()
+        if not sel:
             return
-        for item in self.tree.get_children(): self.tree.delete(item)
-        self.progress["value"] = 0; self.status.set("Загрузка конфига…")
+        file_path = self.tree.set(sel[0], "file")
+        folder = os.path.dirname(file_path)
+        try:
+            os.startfile(folder)
+        except Exception:
+            messagebox.showinfo("Папка", folder)
+
+    def on_run(self):
+        if not self.targets:
+            messagebox.showwarning("Нет входных", "Выберите файлы или папку")
+            return
+        cfg_root = self.cfg_root
         try:
             cfg = load_all(cfg_root)
         except Exception as e:
-            messagebox.showerror(APP_TITLE, f"Ошибка конфига:\n{e}")
+            messagebox.showerror("Конфиг", f"Не удалось загрузить конфиг из:\n{cfg_root}\n\n{e}")
             return
-        self.worker = threading.Thread(target=self._worker_run, args=(list(self.files), cfg), daemon=True)
+
+        files = _enumerate_targets(self.targets, self.recursive_var.get())
+        if not files:
+            messagebox.showwarning("Нет файлов", "Файлы .docx/.txt не найдены")
+            return
+
+        self.on_clear()
+        self.pb.configure(maximum=len(files), value=0)
+        self.status["text"] = "Работаю…"
+
+        # запускаем в отдельном потоке, UI не замораживаем
+        def worker():
+            for ix, path in enumerate(files, 1):
+                try:
+                    issues, by_cat, debug_meta = analyze_file(path, cfg)
+                    # гейт
+                    errors = sum(1 for i in issues if i.severity == "ошибка")
+                    warnings = sum(1 for i in issues if i.severity == "предупреждение")
+                    gate = {"errors": errors, "warnings": warnings, "pass": errors == 0}
+                    write_reports(path, issues, by_cat, gate, APP_VERSION, debug_meta)
+
+                    if not issues:
+                        # всё равно показать строчку-резюме
+                        self.q.put(("row", (path, "—", "—", "—", "", "", "Нет замечаний", "")))
+                    else:
+                        for it in issues:
+                            self.q.put(("row", (
+                                path,
+                                it.severity,
+                                it.category,
+                                it.rule_id,
+                                it.para_index,
+                                it.offset,
+                                it.message,
+                                it.context
+                            )))
+                except Exception as e:
+                    self.q.put(("row", (path, "ошибка", "внутренняя", "EXC", "", "", str(e), "")))
+                finally:
+                    self.q.put(("tick", None))
+
+            self.q.put(("done", None))
+
+        if self.worker and self.worker.is_alive():
+            messagebox.showinfo("Выполняется", "Задача ещё идёт")
+            return
+
+        self.worker = threading.Thread(target=worker, daemon=True)
         self.worker.start()
-        self.root.after(100, self._pump_q)
+        self.after(50, self._pump_queue)
 
-    def _worker_run(self, files, cfg):
-        total = len(files); done = 0
-        for fpath in files:
-            try:
-                issues, by_cat, debug_meta = analyze_file(fpath, cfg)
-                for i in issues:
-                    self.q.put(("row", fpath, i))
-                errors = sum(1 for i in issues if i.severity == "ошибка")
-                warnings = sum(1 for i in issues if i.severity == "предупреждение")
-                self.q.put(("meta", f"[{os.path.basename(fpath)}] ошибок: {errors}; предупреждений: {warnings}"))
-            except Exception as e:
-                self.q.put(("meta", f"[ERR] {fpath}: {e}"))
-                traceback.print_exc()
-            done += 1; self.q.put(("progress", int(done*100/total)))
-        self.q.put(("done",""))
-
-    def _pump_q(self):
-        import queue as _q
+    def _pump_queue(self):
         try:
             while True:
-                kind, *payload = self.q.get_nowait()
+                kind, payload = self.q.get_nowait()
                 if kind == "row":
-                    fpath, i = payload
-                    self.tree.insert("", "end", values=(
-                        os.path.basename(fpath), i.severity, i.category, i.rule_id,
-                        i.para_index, i.offset, i.message, i.context
-                    ))
-                elif kind == "meta":
-                    self.status.set(payload[0])
-                elif kind == "progress":
-                    self.progress["value"] = payload[0]
+                    self.tree.insert("", "end", values=payload)
+                elif kind == "tick":
+                    self.pb["value"] = min(self.pb["value"] + 1, self.pb["maximum"])
                 elif kind == "done":
-                    self.status.set("Готово.")
-        except _q.Empty:
+                    self.status["text"] = f"Готово. {datetime.now().strftime('%H:%M:%S')}"
+        except queue.Empty:
             pass
         if self.worker and self.worker.is_alive():
-            self.root.after(100, self._pump_q)
-
-    def open_reports(self):
-        sel = self.tree.focus()
-        if not sel: return
-        fname = self.tree.item(sel, "values")[0]
-        full = next((p for p in self.files if os.path.basename(p)==fname), None)
-        if not full: return
-        base, _ = os.path.splitext(full)
-        for ext in (".rep",".rep.json"):
-            rp = base + ext
-            if os.path.exists(rp): os.startfile(rp)
-
-    def open_dir(self):
-        sel = self.tree.focus()
-        if not sel: return
-        fname = self.tree.item(sel, "values")[0]
-        full = next((p for p in self.files if os.path.basename(p)==fname), None)
-        if full: os.startfile(os.path.dirname(full))
-
-    def clear_all(self):
-        self.files.clear()
-        for item in self.tree.get_children(): self.tree.delete(item)
-        self.progress["value"] = 0
-        self.status.set("Готово.")
-
-def main():
-    root = Tk()
-    try:
-        from tkinter import font
-        font.nametofont("TkDefaultFont").configure(size=10)
-    except Exception:
-        pass
-    App(root)
-    root.mainloop()
+            self.after(50, self._pump_queue)
 
 if __name__ == "__main__":
-    main()
+    app = App()
+    app.mainloop()
